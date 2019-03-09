@@ -9,7 +9,7 @@ IDE使用MDK,我的版本为5.23。
 
 GROPE LoRa Dev系列由两块板构成：
 	- Dev.kit-v1.1为射频地板，含有MCU(STM32L051C8T6)/RF MODULE/SWD下载口，并吧剩余未用引脚都引出来了
-	- Dev.kit-E-v1.1为开发板的外设版，含有LED灯x2/KEYx1/OLEDx1/USB2-TTL(CH340E)
+	- Dev.kit-E-v1.1为开发板的外设版，含有LED灯x2/KEYx1/OLEDx1/USB-TTL(CH340E)
 
 LoRa 本身为半双工通信，若丢包需检查设备本身的射频参数是否配置正确，并且发送频率是否太高。
 
