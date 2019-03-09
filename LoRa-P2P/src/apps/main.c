@@ -48,11 +48,27 @@ static LoRa_notification_t LoRa_callback;
 static rf_info_t rf_info;
 
 static DeviceState_t device_state;
+static bool is_tx_complete = true;
+
+uint8_t LoRa_send_buf[255] = {31,32,33,34,35};
+uint8_t LoRa_send_data_len = 5;
 
 
 void uart_rx_complete()
 {
     MSG_DBG("uart recv len:%d",uart1.rx_len);
+    
+    memcpy(LoRa_send_buf,uart1.p_rx_buf,uart1.rx_len);
+    LoRa_send_data_len = uart1.rx_len;
+    
+    device_state = DEVICE_SEND;
+}
+
+void key_pressed_handler()
+{
+    MSG_DBG("key pressed");    
+
+    device_state = DEVICE_SEND;    
 }
 
 
@@ -68,11 +84,13 @@ void LoRa_TxDone(void)
 
 #ifdef USE_OLED
     uint8_t buf[64] = {0};
-    sprintf((char*)buf,"tx_count:%ld",tx_count);
+    sprintf((char*)buf,"tx_count:%d",tx_count);
     OLED_ShowString_Line(1,buf);    
 #endif      
     
     device_state = DEVICE_RX;
+    
+    is_tx_complete = true;
 }
 
 void LoRa_RxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr )
@@ -93,7 +111,7 @@ void LoRa_RxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr )
 
 #ifdef USE_OLED
     uint8_t buf[64] = {0};
-    sprintf((char*)buf,"rx_count:%ld",rx_count);
+    sprintf((char*)buf,"rx_count:%d",rx_count);
     OLED_ShowString_Line(2,buf);    
 #endif        
     
@@ -109,7 +127,8 @@ int main( void )
     OLED_Show_Logo();
     OLED_Clean_All_Slowly();
     
-    uart1.rx_complete_callback = uart_rx_complete;    
+    uart1.rx_complete_callback = uart_rx_complete; 
+    key_register_callback(key_pressed_handler);    
     
     uint32_t last_send_tick = HAL_GetTick();    
     
@@ -150,18 +169,25 @@ int main( void )
         switch(device_state)
         {
             case DEVICE_SEND:
-                MSG_DBG("Start Send");
+                
+                if(is_tx_complete == true)
+                {
+                    MSG_DBG("Start Send");
 
-            #ifdef USE_OLED
-                OLED_ShowString_Line(0,"TX RUNNING...");    
-            #endif
-                
-                //LoRa PHY 层发送完成之后会产生TXDONE中断
-                interface_LoRaPhy_SendFrame("12345",sizeof("12345"));
-                
-                last_send_tick = HAL_GetTick();
-            
-                device_state = DEVICE_IDLE;
+                #ifdef USE_OLED
+                    OLED_ShowString_Line(0,"TX RUNNING...");    
+                #endif                    
+                    
+                    //LoRa PHY 层发送完成之后会产生TXDONE中断
+                    interface_LoRaPhy_SendFrame(LoRa_send_buf,LoRa_send_data_len);
+                    
+                    is_tx_complete = false;
+                    
+                    last_send_tick = HAL_GetTick();                    
+
+                    device_state = DEVICE_IDLE;
+                }            
+
                 break;
             
             case DEVICE_RX:
@@ -177,8 +203,8 @@ int main( void )
                 break;
             
             case DEVICE_CYCLE:
-                //每三秒发一个包
-                if(HAL_GetTick() - last_send_tick > 5000)
+                //每10秒发一个包
+                if(HAL_GetTick() - last_send_tick > 10000)
                 {
                     device_state = DEVICE_SEND;
                 }                
